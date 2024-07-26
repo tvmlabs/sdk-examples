@@ -1,0 +1,506 @@
+.fragment c4_to_c7, {
+	PUSHROOT
+	CTOS
+	LDU 256 ; pubkey c4
+	LDU 64 ; pubkey timestamp c4
+	LDU 1 ; ctor flag
+	NIP
+	LDU 32
+	ENDS
+	SETGLOB 10
+	SETGLOB 3
+	SETGLOB 2
+}
+
+.fragment c4_to_c7_with_init_storage, {
+	PUSHROOT
+	CTOS
+	SBITS
+	GTINT 1
+	PUSHCONT {
+		PUSHINT 0
+		PUSHROOT
+		CTOS
+		PLDDICT ; D
+		PUSHINT 0
+		SETGLOB 10
+		PUSHINT 64
+		DICTUGET
+		THROWIFNOT 61
+		PLDU 256
+		SETGLOB 2
+		PUSHINT 0 ; timestamp
+		SETGLOB 3
+	}
+IFREFELSE {
+		.inline c4_to_c7
+}
+}
+
+.fragment c7_to_c4, {
+	GETGLOB 10
+	GETGLOB 3
+	GETGLOB 2
+	NEWC
+	STU 256
+	STU 64
+	STONE
+	STU 32
+	ENDC
+	POPROOT
+}
+
+.fragment constructor, {
+	DROP
+	GETGLOB 2
+	ISNULL
+	IFREF {
+		.inline c4_to_c7_with_init_storage
+	}
+	GETGLOB 6
+	THROWIF 51
+	ENDS
+	.loc helloWorld.sol, 16
+	GETGLOB 2
+	THROWIFNOT 101
+	.loc helloWorld.sol, 19
+	GETGLOB 5
+	DUP
+	ISNULL
+	PUSHCONT {
+		DROP
+		PUSHINT 0
+	}
+	IF
+	GETGLOB 2
+	EQUAL
+	THROWIFNOT 102
+	.loc helloWorld.sol, 23
+	ACCEPT
+	.loc helloWorld.sol, 25
+	NOW
+	SETGLOB 10
+	.loc helloWorld.sol, 0
+	CALLREF {
+		.inline c7_to_c4
+	}
+	THROW 0
+}
+
+.fragment renderHelloWorld_942ae0a7_internal, {
+	.loc helloWorld.sol, 29
+	PUSHREF {
+		.blob x68656c6c6f576f726c64
+	}
+	.loc helloWorld.sol, 0
+}
+
+.fragment renderHelloWorld, {
+	DROP
+	GETGLOB 6
+	THROWIFNOT 76
+	.loc helloWorld.sol, 28
+	ENDS
+	.loc helloWorld.sol, 0
+	CALLREF {
+		.inline renderHelloWorld_942ae0a7_internal
+	}
+	OVER
+	PUSHCONT {
+		PUSH S3
+		CTOS
+		LDU 2
+		LDMSGADDR
+		DROP
+		NIP
+		NEWC
+		STSLICECONST xc
+		STSLICE
+		PUSHINT 2268343370
+		STUR 130
+		STREF
+		ENDC
+		PUSHINT 0
+		SENDRAWMSG
+	}
+	PUSHCONT {
+		DROP
+	}
+	IFELSE
+	IFREF {
+		.inline c7_to_c4
+	}
+	THROW 0
+}
+
+.fragment sendValue_a4569c40_internal, {
+	.loc helloWorld.sol, 48
+	GETGLOB 5
+	DUP
+	ISNULL
+	PUSHCONT {
+		DROP
+		PUSHINT 0
+	}
+	IF
+	GETGLOB 2
+	EQUAL
+	THROWIFNOT 102
+	.loc helloWorld.sol, 49
+	ACCEPT
+	.loc helloWorld.sol, 51
+	XCHG S1, S2
+	NEWC
+	STSLICECONST x6_
+	STI 1
+	STSLICECONST x1_
+	STSLICE
+	SWAP
+	STGRAMS
+	PUSHINT 107
+	STZEROES
+	ENDC
+	PUSHINT 0
+	SENDRAWMSG
+	.loc helloWorld.sol, 0
+}
+
+.fragment sendValue, {
+	DROP
+	GETGLOB 6
+	THROWIFNOT 76
+	GETGLOB 2
+	ISNULL
+	IFREF {
+		.inline c4_to_c7
+	}
+	.loc helloWorld.sol, 47
+	OVER
+	PUSHCONT {
+		LDREF
+		ENDS
+		CTOS
+	}
+	IF
+	LDMSGADDR
+	LDU 128
+	LDI 1
+	ENDS
+	.loc helloWorld.sol, 0
+	CALLREF {
+		.inline sendValue_a4569c40_internal
+	}
+	IFREF {
+		.inline c7_to_c4
+	}
+	THROW 0
+}
+
+.fragment timestamp, {
+	DROP
+	ENDS
+	CALLREF {
+		.inline c4_to_c7
+	}
+	GETGLOB 10
+	OVER
+	PUSHCONT {
+		PUSHSLICE xc0000000000000000000000000e817e535
+		NEWC
+		STSLICE
+		STU 32
+		ENDC
+		PUSHINT 0
+		SENDRAWMSG
+	}
+	IF
+	THROW 0
+}
+
+.fragment timestamp2_71e2dcda_internal, {
+	.loc helloWorld.sol, 33
+	GETGLOB 10
+	.loc helloWorld.sol, 0
+}
+
+.fragment timestamp2, {
+	DROP
+	GETGLOB 6
+	THROWIFNOT 76
+	GETGLOB 2
+	ISNULL
+	IFREF {
+		.inline c4_to_c7
+	}
+	.loc helloWorld.sol, 32
+	ENDS
+	.loc helloWorld.sol, 0
+	CALLREF {
+		.inline timestamp2_71e2dcda_internal
+	}
+	OVER
+	PUSHCONT {
+		PUSH S3
+		CTOS
+		LDU 2
+		LDMSGADDR
+		DROP
+		NIP
+		NEWC
+		STSLICECONST xc
+		STSLICE
+		PUSHINT 4239377173
+		STUR 130
+		STU 32
+		ENDC
+		PUSHINT 0
+		SENDRAWMSG
+	}
+	PUSHCONT {
+		DROP
+	}
+	IFELSE
+	IFREF {
+		.inline c7_to_c4
+	}
+	THROW 0
+}
+
+.fragment touch_a55526db_internal, {
+	.loc helloWorld.sol, 40
+	GETGLOB 5
+	DUP
+	ISNULL
+	PUSHCONT {
+		DROP
+		PUSHINT 0
+	}
+	IF
+	GETGLOB 2
+	EQUAL
+	THROWIFNOT 102
+	.loc helloWorld.sol, 42
+	ACCEPT
+	.loc helloWorld.sol, 44
+	NOW
+	SETGLOB 10
+	.loc helloWorld.sol, 0
+}
+
+.fragment touch, {
+	DROP
+	GETGLOB 6
+	THROWIFNOT 76
+	GETGLOB 2
+	ISNULL
+	IFREF {
+		.inline c4_to_c7
+	}
+	.loc helloWorld.sol, 37
+	ENDS
+	.loc helloWorld.sol, 0
+	CALLREF {
+		.inline touch_a55526db_internal
+	}
+	CALLREF {
+		.inline c7_to_c4
+	}
+	THROW 0
+}
+
+.fragment public_function_selector, {
+	DUP
+	PUSHINT 1746396469
+	LEQ
+	IFJMPREF {
+		DUP
+		PUSHINT 120859722
+		EQUAL
+		IFJMPREF {
+			.inline renderHelloWorld
+		}
+		DUP
+		PUSHINT 925969989
+		EQUAL
+		IFJMPREF {
+			.inline touch
+		}
+		DUP
+		PUSHINT 996398206
+		EQUAL
+		IFJMPREF {
+			.inline sendValue
+		}
+		DUP
+		PUSHINT 1746396469
+		EQUAL
+		IFJMPREF {
+			.inline timestamp
+		}
+	}
+	DUP
+	PUSHINT 2091893525
+	LEQ
+	IFJMPREF {
+		DUP
+		PUSHINT 1756716863
+		EQUAL
+		IFJMPREF {
+			.inline constructor
+		}
+		DUP
+		PUSHINT 2091893525
+		EQUAL
+		IFJMPREF {
+			.inline timestamp2
+		}
+	}
+}
+
+.fragment main_external, {
+	PUSHROOT
+	CTOS
+	SBITS
+	NEQINT 1
+	SETGLOB 6
+	OVER
+	CALLREF {
+		.inline c4_to_c7_with_init_storage
+	}
+	LDU 1 ; haveSign msgSlice
+	SWAP
+	PUSHCONT {
+		PUSHPOW2 9
+		LDSLICEX
+		DUP
+		MYADDR
+		NEWC
+		STSLICE
+		STSLICE
+		ENDC
+		HASHCU
+		ROT
+		GETGLOB 2
+		DUP
+		SETGLOB 5
+		CHKSIGNU
+		THROWIFNOT 40
+	}
+	IF
+	LDU 64 ; timestamp msgSlice
+	SWAP
+	.inline replay_protection
+	LDU 32 ; expireAt msgSlice
+	SWAP
+	NOW ; msgSlice expireAt now
+	GREATER ; msgSlice expireAt>now
+	THROWIFNOT 57
+	LDU 32 ; funcId body
+	SWAP
+	CALLREF {
+		.inline public_function_selector
+	}
+	THROW 60
+}
+
+.fragment main_internal, {
+	PUSHROOT
+	CTOS
+	SBITS
+	NEQINT 1
+	SETGLOB 6
+	PUSH S2
+	CTOS
+	PLDU 4
+	MODPOW2 1
+	IFRET
+	OVER
+	SEMPTY ; isEmpty
+	IFJMPREF {
+		GETGLOB 6
+		THROWIFNOT 76
+	}
+	OVER
+	LDUQ 32  ; [funcId] body' ok
+	THROWIFNOT 60
+	OVER
+	IFNOTJMPREF {
+		GETGLOB 6
+		THROWIFNOT 76
+	}
+	SWAP
+	CALLREF {
+		.inline public_function_selector
+	}
+	THROW 60
+}
+
+.fragment upd_only_time_in_c4, {
+	PUSHROOT
+	CTOS
+	LDU 256
+	LDU 64
+	NIP
+	GETGLOB 3
+	ROT
+	NEWC
+	STU 256
+	STU 64
+	STSLICE
+	ENDC
+	POPROOT
+}
+
+.fragment onTickTock, {
+}
+
+.fragment default_data_dict_cell, {
+	PUSHINT 0
+	NEWC
+	STU 256
+	PUSHINT 0
+	NEWDICT
+	PUSHINT 64
+	DICTUSETB
+}
+
+; The code below forms a value of the StateInit type.
+.blob x4_ ; split_depth = nothing
+.blob x4_ ; special = nothing
+.blob xc_ ; code = just
+.cell { ; code cell
+	PUSHREFCONT {
+		DICTPUSHCONST 32
+		DICTUGETJMPZ
+		THROW 78
+		.code-dict-cell 32, {
+		}
+		.cell { ; version
+			.blob x736f6c20302e37322e30 ; sol 0.72.0
+		}
+	}
+	POPCTR c3
+	DUP
+	IFNOTJMPREF {
+		.inline main_internal
+	}
+	DUP
+	EQINT -1
+	IFJMPREF {
+		.inline main_external
+	}
+	DUP
+	EQINT -2
+	IFJMPREF {
+		.inline onTickTock
+	}
+	THROW 11
+}
+.blob xc_ ; data = just
+.cell { 
+	.blob xc_
+	.cell { 
+		.inline-computed-cell default_data_dict_cell, 0
+	}
+}
+.blob x4_ ; library = hme_empty

@@ -1,0 +1,24 @@
+{
+  "name": "helloworld",
+  "version": "1.0.0",
+  "description": "TVM Labs SDK (JavaScript) Example",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gosh-sh/gosh-examples.git"
+  },
+  "author": "Contributors to the GOSH DAO",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/gosh-sh/gosh-examples/issues"
+  },
+  "homepage": "https://github.com/gosh-sh/gosh-examples#readme",
+  "dependencies": {
+    "@eversdk/core": "^1.45.1",
+    "@eversdk/lib-node": "^1.45.1",
+    "dotenv": "^16.4.5"
+  }
+}

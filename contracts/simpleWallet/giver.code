@@ -1,0 +1,311 @@
+.fragment c4_to_c7, {
+	PUSHROOT
+	CTOS
+	LDU 256 ; pubkey c4
+	LDU 64 ; pubkey timestamp c4
+	LDU 1 ; ctor flag
+	NIP
+	ENDS
+	SETGLOB 3
+	SETGLOB 2
+}
+
+.fragment c4_to_c7_with_init_storage, {
+	PUSHROOT
+	CTOS
+	SBITS
+	GTINT 1
+	PUSHCONT {
+		PUSHINT 0
+		PUSHROOT
+		CTOS
+		PLDDICT ; D
+		PUSHINT 64
+		DICTUGET
+		THROWIFNOT 61
+		PLDU 256
+		SETGLOB 2
+		PUSHINT 0 ; timestamp
+		SETGLOB 3
+	}
+IFREFELSE {
+		.inline c4_to_c7
+}
+}
+
+.fragment c7_to_c4, {
+	GETGLOB 3
+	GETGLOB 2
+	NEWC
+	STU 256
+	STU 64
+	STONE
+	ENDC
+	POPROOT
+}
+
+.fragment constructor, {
+	DROP
+	GETGLOB 2
+	ISNULL
+	IFREF {
+		.inline c4_to_c7_with_init_storage
+	}
+	GETGLOB 6
+	THROWIF 51
+	ENDS
+	.loc giver.sol, 11
+	GETGLOB 5
+	DUP
+	ISNULL
+	PUSHCONT {
+		DROP
+		PUSHINT 0
+	}
+	IF
+	GETGLOB 2
+	EQUAL
+	THROWIFNOT 100
+	.loc giver.sol, 16
+	ACCEPT
+	.loc giver.sol, 0
+	CALLREF {
+		.inline c7_to_c4
+	}
+	THROW 0
+}
+
+.fragment sendTransaction_9e018e00_internal, {
+	.loc giver.sol, 11
+	GETGLOB 5
+	DUP
+	ISNULL
+	PUSHCONT {
+		DROP
+		PUSHINT 0
+	}
+	IF
+	GETGLOB 2
+	EQUAL
+	THROWIFNOT 100
+	.loc giver.sol, 16
+	ACCEPT
+	.loc giver.sol, 33
+	XCHG S1, S2
+	NEWC
+	STSLICECONST x6_
+	STI 1
+	STSLICECONST x1_
+	STSLICE
+	SWAP
+	STGRAMS
+	PUSHINT 107
+	STZEROES
+	ENDC
+	PUSHINT 3
+	SENDRAWMSG
+	.loc giver.sol, 0
+}
+
+.fragment sendTransaction, {
+	DROP
+	GETGLOB 6
+	THROWIFNOT 76
+	GETGLOB 2
+	ISNULL
+	IFREF {
+		.inline c4_to_c7
+	}
+	.loc giver.sol, 31
+	OVER
+	PUSHCONT {
+		LDREF
+		ENDS
+		CTOS
+	}
+	IF
+	LDMSGADDR
+	LDU 128
+	LDI 1
+	ENDS
+	.loc giver.sol, 0
+	CALLREF {
+		.inline sendTransaction_9e018e00_internal
+	}
+	IFREF {
+		.inline c7_to_c4
+	}
+	THROW 0
+}
+
+.fragment public_function_selector, {
+	DUP
+	PUSHINT 828307765
+	EQUAL
+	IFJMPREF {
+		.inline sendTransaction
+	}
+	DUP
+	PUSHINT 1756716863
+	EQUAL
+	IFJMPREF {
+		.inline constructor
+	}
+}
+
+.fragment main_external, {
+	PUSHROOT
+	CTOS
+	SBITS
+	NEQINT 1
+	SETGLOB 6
+	OVER
+	CALLREF {
+		.inline c4_to_c7_with_init_storage
+	}
+	LDU 1 ; haveSign msgSlice
+	SWAP
+	PUSHCONT {
+		PUSHPOW2 9
+		LDSLICEX
+		DUP
+		MYADDR
+		NEWC
+		STSLICE
+		STSLICE
+		ENDC
+		HASHCU
+		ROT
+		GETGLOB 2
+		DUP
+		SETGLOB 5
+		CHKSIGNU
+		THROWIFNOT 40
+	}
+	IF
+	LDU 64 ; timestamp msgSlice
+	SWAP
+	.inline replay_protection
+	LDU 32 ; funcId body
+	SWAP
+	CALLREF {
+		.inline public_function_selector
+	}
+	THROW 60
+}
+
+.fragment main_internal, {
+	PUSHROOT
+	CTOS
+	SBITS
+	NEQINT 1
+	SETGLOB 6
+	PUSH S2
+	CTOS
+	PLDU 4
+	MODPOW2 1
+	IFRET
+	OVER
+	SEMPTY ; isEmpty
+	IFJMPREF {
+		GETGLOB 6
+		THROWIFNOT 76
+	}
+	OVER
+	LDUQ 32  ; [funcId] body' ok
+	THROWIFNOT 60
+	OVER
+	IFNOTJMPREF {
+		GETGLOB 6
+		THROWIFNOT 76
+	}
+	SWAP
+	CALLREF {
+		.inline public_function_selector
+	}
+	THROW 60
+}
+
+.fragment receive, {
+	GETGLOB 6
+	THROWIFNOT 76
+	GETGLOB 2
+	ISNULL
+	IFREF {
+		.inline c4_to_c7
+	}
+	.loc giver.sol, 0
+	CALLREF {
+		.inline c7_to_c4
+	}
+}
+
+.fragment upd_only_time_in_c4, {
+	PUSHROOT
+	CTOS
+	LDU 256
+	LDU 64
+	NIP
+	GETGLOB 3
+	ROT
+	NEWC
+	STU 256
+	STU 64
+	STSLICE
+	ENDC
+	POPROOT
+}
+
+.fragment onTickTock, {
+}
+
+.fragment default_data_dict_cell, {
+	PUSHINT 0
+	NEWC
+	STU 256
+	PUSHINT 0
+	NEWDICT
+	PUSHINT 64
+	DICTUSETB
+}
+
+; The code below forms a value of the StateInit type.
+.blob x4_ ; split_depth = nothing
+.blob x4_ ; special = nothing
+.blob xc_ ; code = just
+.cell { ; code cell
+	PUSHREFCONT {
+		DICTPUSHCONST 32
+		DICTUGETJMPZ
+		THROW 78
+		.code-dict-cell 32, {
+		}
+		.cell { ; version
+			.blob x736f6c20302e37322e30 ; sol 0.72.0
+		}
+	}
+	POPCTR c3
+	DUP
+	IFNOTJMPREF {
+		.inline main_internal
+	}
+	DUP
+	EQINT -1
+	IFJMPREF {
+		.inline main_external
+	}
+	DUP
+	EQINT -2
+	IFJMPREF {
+		.inline onTickTock
+	}
+	THROW 11
+}
+.blob xc_ ; data = just
+.cell { 
+	.blob xc_
+	.cell { 
+		.inline-computed-cell default_data_dict_cell, 0
+	}
+}
+.blob x4_ ; library = hme_empty

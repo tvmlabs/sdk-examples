@@ -1,0 +1,16 @@
+[package]
+name = "qs-sdk"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.80"
+base64 = "0.22.0"
+dotenv = "0.15.0"
+serde = "1.0.197"
+serde_json = "1.0.114"
+tokio = { version = '1.36.0', features = ['full', 'rt'] }
+tvm_client = { git = 'https://github.com/tvmlabs/tvm-sdk.git', tag = 'rc-1.47.0' }
+tvm_sdk = { git = 'https://github.com/tvmlabs/tvm-sdk.git', tag = 'rc-1.47.0' }
