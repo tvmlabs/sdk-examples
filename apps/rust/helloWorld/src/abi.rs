@@ -8,7 +8,7 @@ macro_rules! abi {
 
 type Abi = (&'static str, &'static str);
 
-pub static GIVER: Abi = abi!("giver.abi.json");
+pub static WALLET: Abi = abi!("wallet.abi.json");
 pub static HELLO_WORLD: Abi = abi!("helloWorld.abi.json");
 
 pub fn u32_from_str<'de, D>(des: D) -> Result<u32, D::Error>

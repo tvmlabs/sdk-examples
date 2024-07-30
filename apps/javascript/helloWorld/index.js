@@ -6,12 +6,12 @@ require('dotenv').config();
 const { TonClient, abiContract, signerKeys, signerNone } = require('@eversdk/core');
 const { libNode } = require('@eversdk/lib-node');
 
-const { helloWorld } = require('./contracts/helloWorld.js');
-const GIVER_ABI = require('../../../contracts/simpleWallet/giver.abi.json');
-const GIVER_KEYS = readKeysFromFile(process.env.GIVER_KEYS);
+const { helloWorld } = require('./resources/helloWorld.js');
+const WALLET_ABI = require('../../../contracts/simpleWallet/wallet.abi.json');
+const WALLET_KEYS = readKeysFromFile(process.env.WALLET_KEYS);
 
 const ENDPOINTS = ['https://ackinacki-testnet.tvmlabs.dev'];
-const GIVER_ADDRESS = process.env.GIVER_ADDRESS;
+const WALLET_ADDRESS = process.env.WALLET_ADDRESS;
 
 TonClient.useBinaryLibrary(libNode);
 const client = new TonClient({
@@ -29,7 +29,7 @@ const client = new TonClient({
         const helloWorldAddress = await calcHelloWorldAddress(helloWorldKeys);
 
         // Send some tokens to `helloWorldAddress` before deploy
-        await getTokensFromGiver(helloWorldAddress, 1_000_000_000);
+        await getTokensFromWallet(helloWorldAddress, 1_000_000_000);
 
         // Deploy helloWorld
         await deploy(helloWorldKeys);
@@ -61,13 +61,7 @@ const client = new TonClient({
         process.exit(0);
     } catch (error) {
         if (error.code === 504) {
-            console.error(
-                [
-                    'Network is inaccessible. You have to start Evernode SE using `everdev se start`',
-                    'If you run SE on another port or ip, replace http://localhost endpoint with',
-                    'http://localhost:port or http://ip:port in index.js file.',
-                ].join('\n'),
-            );
+            console.error('Network is inaccessible.');
         } else {
             console.error(error);
             process.exit(1);
@@ -103,15 +97,15 @@ function buildDeployOptions(keys) {
     };
 }
 
-// Request funds from Giver contract
-async function getTokensFromGiver(dest, value) {
-    console.log(`Transfering ${value} tokens from giver to ${dest}`);
+// Request funds from Wallet contract
+async function getTokensFromWallet(dest, value) {
+    console.log(`Transfering ${value} tokens from wallet to ${dest}`);
 
     const params = {
         send_events: false,
         message_encode_params: {
-            address: GIVER_ADDRESS,
-            abi: abiContract(GIVER_ABI),
+            address: WALLET_ADDRESS,
+            abi: abiContract(WALLET_ABI),
             call_set: {
                 function_name: 'sendTransaction',
                 input: {
@@ -122,7 +116,7 @@ async function getTokensFromGiver(dest, value) {
             },
             signer: {
                 type: 'Keys',
-                keys: GIVER_KEYS,
+                keys: WALLET_KEYS,
             },
         },
     };
@@ -281,10 +275,10 @@ async function sendValue(address, dest, amount, keys) {
 // Helpers
 function readKeysFromFile(fname) {
     const fullName = path.join(__dirname, fname);
-    console.log("giver keys fname:", fname);
-    // Read the Giver keys. We need them to sponsor a new contract
+    console.log("wallet keys fname:", fname);
+    // Read the Wallet keys. We need them to sponsor a new contract
     if (!fs.existsSync(fullName)) {
-        console.log(`Please place ${fname} file with Giver keys in project root folder`);
+        console.log(`Please place ${fname} file with Wallet keys in project root folder`);
         process.exit(1);
     }
     return JSON.parse(fs.readFileSync(fullName, 'utf8'));

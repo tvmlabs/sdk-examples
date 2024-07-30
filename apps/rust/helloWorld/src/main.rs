@@ -43,16 +43,16 @@ pub fn init_sdk() -> anyhow::Result<Arc<ClientContext>> {
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
 
-    // Initializing the Giver
+    // Initializing the Wallet
     let client = init_sdk()?;
-    let giver_keys_path = std::env::var("GIVER_KEYS")?;
-    let giver_keys = load_keys(&giver_keys_path)?;
-    let giver_address = std::env::var("GIVER_ADDRESS")?;
-    let giver = GoshContract::new(&giver_address, abi::GIVER, Some(giver_keys));
+    let wallet_keys_path = std::env::var("WALLET_KEYS")?;
+    let wallet_keys = load_keys(&wallet_keys_path)?;
+    let wallet_address = std::env::var("WALLET_ADDRESS")?;
+    let wallet = GoshContract::new(&wallet_address, abi::WALLET, Some(wallet_keys));
 
     // deploy contract
     let tvc_path = std::env::var("CONTRACT_CODE")?;
-    let hello_world = blockchain::deploy(&client, abi::HELLO_WORLD, &tvc_path, None, &giver).await?;
+    let hello_world = blockchain::deploy(&client, abi::HELLO_WORLD, &tvc_path, None, &wallet).await?;
 
     // run getter-method `timestamp()`
     let result: TimestampResult = hello_world

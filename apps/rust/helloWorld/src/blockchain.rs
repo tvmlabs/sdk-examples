@@ -192,7 +192,7 @@ pub async fn deploy(
     (pretty_name, abi): (&str, &str),
     tvc_path: &str,
     keys: Option<KeyPair>,
-    giver: &GoshContract,
+    wallet: &GoshContract,
 ) -> anyhow::Result<GoshContract> {
     let keys = match keys {
         None => generate_random_sign_keys(ctx.clone())?,
@@ -225,9 +225,9 @@ pub async fn deploy(
     println!("Future address: {}", address);
     let contract = GoshContract::new(&address, (pretty_name, abi), Some(keys.clone()));
 
-    println!("Requesting tokens from giver-contract...");
+    println!("Requesting tokens from wallet-contract...");
     // replenishment of the balance the contract
-    blockchain::send_tokens(ctx, giver, &address, 1_000_000_000).await?;
+    blockchain::send_tokens(ctx, wallet, &address, 1_000_000_000).await?;
 
     let mut tries = 0;
     // checking the status of the contract
@@ -279,7 +279,7 @@ pub async fn deploy(
 // the function of replenishing the balance of the contract
 async fn send_tokens(
     ctx: &Arc<ClientContext>,
-    giver: &GoshContract,
+    wallet: &GoshContract,
     to: &str,
     value: u64
 ) -> anyhow::Result<()> {
@@ -288,7 +288,7 @@ async fn send_tokens(
         "value": value,
         "bounce": false
     });
-    let trx_id = giver.call(ctx, "sendTransaction", Some(args)).await?;
+    let trx_id = wallet.call(ctx, "sendTransaction", Some(args)).await?;
     println!("Transaction id: {}", trx_id);
 
     Ok(())

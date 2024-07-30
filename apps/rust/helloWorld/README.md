@@ -4,7 +4,7 @@
 
 * Rust 1.76+
 * Cargo
-* [Wallet-contract](https://github.com/gosh-sh/gosh-examples/blob/main/contracts/simpleWallet/giver.sol) to be used as a giver with keys
+* [Wallet-contract](https://github.com/gosh-sh/gosh-examples/blob/main/contracts/simpleWallet/wallet.sol) to be used as a wallet with keys
 * Contract [`helloWorld.sol`](https://github.com/gosh-sh/gosh-examples/tree/main/contracts/helloWorld/helloWorld.sol)
 * This demo application
 
@@ -13,7 +13,7 @@ This demo app implements the following logic:
 
 1. Creates and initialize an instance of the SDK client;
 
-2. Creates a giver contract instance (will be used for send tokens to helloWorld contract);
+2. Creates a wallet contract instance (will be used for send tokens to helloWorld contract);
 
 3. Deploys the helloWorld contract:
 
@@ -31,15 +31,15 @@ This demo app implements the following logic:
 After you have created and deployed the wallet and helloWorld contracts, you should to place their ABI files in the `resources` folder.
 
 
-## **Setup giver**
+## **Setup waller**
 
-Before you start, you should setup a wallet contract to be used as a giver.
+Before you start, you should setup a wallet contract to be used as a wallet.
 Create `.env` file with following content:
 
 ```
 CONTRACT_CODE=PATH_TO_HELLOWORLD_CONTRACT_CODE    # helloWorld.tvc
-GIVER_ADDRESS=YOUR_WALLET_ADDRESS
-GIVER_KEYS=PATH_TO_YOUR_WALLET_KEYS_FILE
+WALLET_ADDRESS=YOUR_WALLET_ADDRESS
+WALLET_KEYS=PATH_TO_YOUR_WALLET_KEYS_FILE
 ```
 
 ## **Run it**
@@ -52,7 +52,7 @@ You will see a result similar to the following:
 
 ```
 Future address: 0:41b8b9d954bfd2c9646fd3e6fc56c73cc091fd5acbcee6b1c2593b4d8beecddf
-Requesting tokens from giver-contract...
+Requesting tokens from wallet-contract...
 Transaction id: 9167ef30059487d8dbfbd3e505d3fa3944218a748b9f8bc9a5344983555da377
 
 Contract status: Uninit (ready to deploy)
