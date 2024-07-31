@@ -1,0 +1,24 @@
+{
+  "name": "helloworld",
+  "version": "1.0.0",
+  "description": "TVM Labs SDK (Node.js) Example",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tvmlabs/sdk-examples.git"
+  },
+  "author": "TVM Labs",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/tvmlabs/sdk-examples/issues"
+  },
+  "homepage": "https://github.com/tvmlabs/sdk-examples#readme",
+  "dependencies": {
+    "@tvmsdk/core": "^2",
+    "@tvmsdk/lib-node": "^2",
+    "dotenv": "^16.4.5"
+  }
+}

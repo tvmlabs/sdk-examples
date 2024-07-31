@@ -3,11 +3,11 @@ const path = require('path');
 
 require('dotenv').config();
 
-const { TonClient, abiContract, signerKeys, signerNone } = require('@eversdk/core');
-const { libNode } = require('@eversdk/lib-node');
+const { TonClient, abiContract, signerKeys, signerNone } = require('@tvmsdk/core');
+const { libNode } = require('@tvmsdk/lib-node');
 
 const { helloWorld } = require('./resources/helloWorld.js');
-const WALLET_ABI = require('../../../contracts/simpleWallet/wallet.abi.json');
+const WALLET_ABI = require('../../../../contracts/simpleWallet/wallet.abi.json');
 const WALLET_KEYS = readKeysFromFile(process.env.WALLET_KEYS);
 
 const ENDPOINTS = ['https://ackinacki-testnet.tvmlabs.dev'];
