@@ -3,18 +3,18 @@ const path = require('path');
 
 require('dotenv').config();
 
-const { TonClient, abiContract, signerKeys, signerNone } = require('@tvmsdk/core');
+const { TvmClient, abiContract, signerKeys, signerNone } = require('@tvmsdk/core');
 const { libNode } = require('@tvmsdk/lib-node');
 
 const { helloWorld } = require('./resources/helloWorld.js');
-const WALLET_ABI = require('../../../../contracts/simpleWallet/wallet.abi.json');
+const WALLET_ABI = require('../../../contracts/simpleWallet/wallet.abi.json');
 const WALLET_KEYS = readKeysFromFile(process.env.WALLET_KEYS);
 
 const ENDPOINTS = ['https://ackinacki-testnet.tvmlabs.dev'];
 const WALLET_ADDRESS = process.env.WALLET_ADDRESS;
 
-TonClient.useBinaryLibrary(libNode);
-const client = new TonClient({
+TvmClient.useBinaryLibrary(libNode);
+const client = new TvmClient({
     network: {
         endpoints: ENDPOINTS
     },
@@ -278,7 +278,7 @@ function readKeysFromFile(fname) {
     console.log("wallet keys fname:", fname);
     // Read the Wallet keys. We need them to sponsor a new contract
     if (!fs.existsSync(fullName)) {
-        console.log(`Please place ${fname} file with Wallet keys in project root folder`);
+        console.log(`File ${fname} is missing.`);
         process.exit(1);
     }
     return JSON.parse(fs.readFileSync(fullName, 'utf8'));
