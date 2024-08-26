@@ -1,1 +1,1 @@
-Specify path to the sponsor adress and wallet keys in .env file.
+Specify path to the sponsor wallet and wallet keys in .env file.
