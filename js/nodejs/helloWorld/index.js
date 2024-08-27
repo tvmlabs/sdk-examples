@@ -99,7 +99,7 @@ function buildDeployOptions(keys) {
 
 // Request funds from Wallet contract
 async function getTokensFromWallet(dest, value) {
-    console.log(`Transfering ${value} tokens from wallet to ${dest}`);
+    console.log(`Transferring ${value} tokens from wallet to ${dest}`);
 
     const params = {
         send_events: false,
@@ -121,7 +121,7 @@ async function getTokensFromWallet(dest, value) {
         },
     };
     await client.processing.process_message(params);
-    console.log('Success. Tokens were transfered\n');
+    console.log('Success. Tokens were transferred\n');
 }
 
 async function deploy(keys) {
@@ -268,20 +268,20 @@ async function sendValue(address, dest, amount, keys) {
     console.log(`Sending ${amount} tokens to ${dest}`);
     // Call `sendValue` function
     const response = await client.processing.process_message(sendValueParams);
-    console.log('Success. Target account will recieve: %d tokens\n', response.fees.total_output);
+    console.log('Success. Target account will receive: %d tokens\n', response.fees.total_output);
     return response.transaction.lt;
 }
 
 // Helpers
 function readKeysFromFile(fname) {
-    const fullName = path.join(__dirname, fname);
+    // const fullName = path.join(__dirname, fname);
     console.log("wallet keys fname:", fname);
     // Read the Wallet keys. We need them to sponsor a new contract
-    if (!fs.existsSync(fullName)) {
+    if (!fs.existsSync(fname)) {
         console.log(`File ${fname} is missing.`);
         process.exit(1);
     }
-    return JSON.parse(fs.readFileSync(fullName, 'utf8'));
+    return JSON.parse(fs.readFileSync(fname, 'utf8'));
 }
 
 async function genRandomAddress() {
