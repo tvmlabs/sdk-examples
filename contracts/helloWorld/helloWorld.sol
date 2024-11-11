@@ -50,6 +50,8 @@ contract helloWorld {
     }
 
     // Updates the `timestamp` variable with the current blockchain time.
+    // We will use this function to modify the data in the contract.
+    // Сalled by an external message.
     function touch() external {
         // Informs the TVM that we accept this message.
         tvm.accept();
@@ -57,6 +59,8 @@ contract helloWorld {
         timestamp = block.timestamp;
     }
 
+    // Used to call the touch method of a contract via an internal message.
+    // Parameter 'addr' - the address of the contract where the 'touch' will be invoked.
     function callExtTouch(address addr) public view {
         // Each function that accepts an external message must check that
         // the message is correctly signed.
@@ -74,8 +78,8 @@ contract helloWorld {
     }
 
     /// Allows the custodian if they are the sole owner of multisig wallet, to transfer funds with minimal fees.
-    /// Parameter `dest` The target address to receive the transfer.
-    /// Parameter `value` The amount of SHELL tokens to transfer.
+    /// Parameter `dest`- the target address to receive the transfer.
+    /// Parameter `value` - the amount of SHELL tokens to transfer.
     function sendShell(address dest, uint128 value) public view {
         require(msg.pubkey() == tvm.pubkey(), 102);
         tvm.accept();
@@ -90,9 +94,9 @@ contract helloWorld {
     /// Deploys a new contract within its Dapp.
     /// The address of the new contract is calculated as a hash of its initial state.
     /// The owner's public key is part of the initial state.
-    /// Parameter `stateInit`
-    /// Parameter `initialBalance` The amount of funds to transfer. 
-    /// Parameter `payload` A tree of cells used as the body of the outbound internal message.
+    /// Parameter `stateInit`- the contract code plus data.
+    /// Parameter `initialBalance` - the amount of funds to transfer. 
+    /// Parameter `payload` - a tree of cells used as the body of the outbound internal message.
     function deployNewContract(
         TvmCell stateInit,
         uint128 initialBalance,
