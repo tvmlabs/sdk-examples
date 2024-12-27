@@ -1,4 +1,4 @@
-pragma tvm-solidity >=0.76.0;
+pragma tvm-solidity >=0.76.1;
 pragma AbiHeader expire;
 
 interface IHelloWorld {
@@ -24,10 +24,6 @@ contract helloWorld {
         // Ensure that the contract's public key is set.
         require(tvm.pubkey() != 0, 101);
 
-        // Verify that the message is signed (msg.pubkey() is not zero) 
-        // and that it is signed with the owner's private key.
-        // require(msg.pubkey() == tvm.pubkey(), 102);
-
         // The current smart contract agrees to buy some gas to complete the
         // current transaction. This action is required to process external
         // messages, which carry no value (and therefore no gas).
@@ -40,6 +36,7 @@ contract helloWorld {
     // Converts SHELL to VMSHELL for payment of transaction fees
     function exchangeToken(uint64 value) public pure {
         tvm.accept();
+        getTokens();
         gosh.cnvrtshellq(value);
     }
 
@@ -55,6 +52,7 @@ contract helloWorld {
     function touch() external {
         // Informs the TVM that we accept this message.
         tvm.accept();
+        getTokens();
         // Update the timestamp variable with the current block timestamp.
         timestamp = block.timestamp;
     }
@@ -66,6 +64,7 @@ contract helloWorld {
         // the message is correctly signed.
         require(msg.pubkey() == tvm.pubkey(), 102);
         tvm.accept();
+        getTokens();
         IHelloWorld(addr).touch();
     }
 
@@ -73,20 +72,22 @@ contract helloWorld {
     function sendVMShell(address dest, uint128 amount, bool bounce) public view {
         require(msg.pubkey() == tvm.pubkey(), 102);
         tvm.accept();
+        getTokens();
         // Enables a transfer with arbitrary settings
         dest.transfer(varuint16(amount), bounce, 0);
     }
 
     /// Allows the custodian if they are the sole owner of multisig wallet, to transfer funds with minimal fees.
-    /// Parameter `dest`- the target address to receive the transfer.
-    /// Parameter `value` - the amount of SHELL tokens to transfer.
+    /// Parameter `dest` - the target address to receive the transfer.
+    /// Parameter `value`- the amount of SHELL tokens to transfer.
     function sendShell(address dest, uint128 value) public view {
         require(msg.pubkey() == tvm.pubkey(), 102);
         tvm.accept();
+        getTokens();
 
         TvmCell payload;
         mapping(uint32 => varuint32) cc;
-        cc[2] = varuint16(value);
+        cc[2] = varuint32(value);
         // Executes transfer to target address
         dest.transfer(0, true, 1, payload, cc);
     }
@@ -94,7 +95,7 @@ contract helloWorld {
     /// Deploys a new contract within its Dapp.
     /// The address of the new contract is calculated as a hash of its initial state.
     /// The owner's public key is part of the initial state.
-    /// Parameter `stateInit`- the contract code plus data.
+    /// Parameter `stateInit` - the contract code plus data.
     /// Parameter `initialBalance` - the amount of funds to transfer. 
     /// Parameter `payload` - a tree of cells used as the body of the outbound internal message.
     function deployNewContract(
@@ -106,8 +107,20 @@ contract helloWorld {
     {
         // Runtime function to deploy contract with prepared msg body for constructor call.
         tvm.accept();
+        getTokens();
         address addr = address.makeAddrStd(0, tvm.hash(stateInit));
         addr.transfer({stateInit: stateInit, body: payload, value: varuint16(initialBalance)});
-    } 
+    }
+    
+    // Checks the contract balance
+    // and if it is below the specified limit, mints VMSHELL.
+    // Used to enable automatic balance replenishment.
+    function getTokens() private pure {
+        if (address(this).balance > 100000000000) {     // 100 VMSHELL
+            return; 
+        }
+        gosh.mintshell(100000000000);                   // 100 VMSHELL
+    }
 
 }
+
