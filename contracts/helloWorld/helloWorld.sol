@@ -34,6 +34,7 @@ contract helloWorld {
     }
 
     // Converts SHELL to VMSHELL for payment of transaction fees
+    // Parameter `value`- the amount of SHELL tokens that will be exchanged 1-to-1 into VMSHELL tokens.
     function exchangeToken(uint64 value) public pure {
         tvm.accept();
         getTokens();
@@ -69,6 +70,10 @@ contract helloWorld {
     }
 
     // Sends VMSHELL to another contract with the same Dapp ID.
+    // Parameter `dest` - the target address within the same Dapp ID to receive the transfer.
+    // Parameter `value`- the amount of VMSHELL tokens to transfer.
+    // Parameter `bounce` - Bounce flag. Set true if need to transfer funds to existing account;
+    // set false to create new account.
     function sendVMShell(address dest, uint128 amount, bool bounce) public view {
         require(msg.pubkey() == tvm.pubkey(), 102);
         tvm.accept();
@@ -77,9 +82,9 @@ contract helloWorld {
         dest.transfer(varuint16(amount), bounce, 0);
     }
 
-    /// Allows the custodian if they are the sole owner of multisig wallet, to transfer funds with minimal fees.
-    /// Parameter `dest` - the target address to receive the transfer.
-    /// Parameter `value`- the amount of SHELL tokens to transfer.
+    // Allows transferring SHELL tokens within the same Dapp ID and to other Dapp IDs.
+    // Parameter `dest` - the target address to receive the transfer.
+    // Parameter `value`- the amount of SHELL tokens to transfer.
     function sendShell(address dest, uint128 value) public view {
         require(msg.pubkey() == tvm.pubkey(), 102);
         tvm.accept();
@@ -92,12 +97,12 @@ contract helloWorld {
         dest.transfer(0, true, 1, payload, cc);
     }
 
-    /// Deploys a new contract within its Dapp.
-    /// The address of the new contract is calculated as a hash of its initial state.
-    /// The owner's public key is part of the initial state.
-    /// Parameter `stateInit` - the contract code plus data.
-    /// Parameter `initialBalance` - the amount of funds to transfer. 
-    /// Parameter `payload` - a tree of cells used as the body of the outbound internal message.
+    // Deploys a new contract within its Dapp.
+    // The address of the new contract is calculated as a hash of its initial state.
+    // The owner's public key is part of the initial state.
+    // Parameter `stateInit` - the contract code plus data.
+    // Parameter `initialBalance` - the amount of funds to transfer. 
+    // Parameter `payload` - a tree of cells used as the body of the outbound internal message.
     function deployNewContract(
         TvmCell stateInit,
         uint128 initialBalance,
@@ -114,6 +119,7 @@ contract helloWorld {
     
     // Checks the contract balance
     // and if it is below the specified limit, mints VMSHELL.
+    // The amounts are specified in nanotokens.
     // Used to enable automatic balance replenishment.
     function getTokens() private pure {
         if (address(this).balance > 100000000000) {     // 100 VMSHELL
