@@ -7,10 +7,11 @@ const { TvmClient, abiContract, signerKeys, signerNone } = require('@tvmsdk/core
 const { libNode } = require('@tvmsdk/lib-node');
 
 const { helloWorld } = require('./resources/helloWorld.js');
-const WALLET_ABI = require('../../../contracts/simpleWallet/wallet.abi.json');
+const WALLET_ABI = require('../../../../../wallet/multisig.abi.json');
 const WALLET_KEYS = readKeysFromFile(process.env.WALLET_KEYS);
 
-const ENDPOINTS = ['https://ackinacki-testnet.tvmlabs.dev'];
+const ENDPOINTS = ['https://shellnet.ackinacki.org'];
+
 const WALLET_ADDRESS = process.env.WALLET_ADDRESS;
 
 TvmClient.useBinaryLibrary(libNode);
@@ -29,33 +30,37 @@ const client = new TvmClient({
         const helloWorldAddress = await calcHelloWorldAddress(helloWorldKeys);
 
         // Send some tokens to `helloWorldAddress` before deploy
-        await getTokensFromWallet(helloWorldAddress, 1_000_000_000);
+        await getTokensFromWallet(helloWorldAddress, 2_000_000_000);
 
         // Deploy helloWorld
         await deploy(helloWorldKeys);
 
         // Get account info and print balance of the helloWorld contract
-        const accountState = await getAccount(helloWorldAddress);
+        let accountState = await getAccount(helloWorldAddress);
         console.log("helloWorld balance is", accountState.balance);
 
-        // Run account's get method `getTimestamp`
-        let helloWorldTimestamp = await runGetMethod('getTimestamp', helloWorldAddress, accountState.boc);
+        // Run account's get method `timestamp`
+        let helloWorldTimestamp = await runGetMethod('timestamp', helloWorldAddress, accountState.boc);
         console.log("`timestamp` value is", helloWorldTimestamp)
 
         // Perform 2 seconds sleep, so that we receive an updated timestamp
         await new Promise(r => setTimeout(r, 2000));
+
         // Execute `touch` method for newly deployed helloWorld contract
         // Remember the logical time of the generated transaction
-        let transLt = await runOnChain(helloWorldAddress, "touch");
+        await runOnChain(helloWorldAddress, "touch");
+
+        // Get account updated account BOC of the helloWorld contract
+        accountState = await getAccount(helloWorldAddress);
 
         // Run contract's get method locally after account is updated
-        helloWorldTimestamp = await runGetMethodAfterLt('getTimestamp', helloWorldAddress, transLt);
+        helloWorldTimestamp = await runGetMethod('timestamp', helloWorldAddress, accountState.boc);
         console.log("Updated `timestamp` value is", helloWorldTimestamp)
 
         // Send some tokens from helloWorld to a random account
         // Remember the logical time of the generated transaction
         const destAddress = await genRandomAddress();
-        transLt = await sendValue(helloWorldAddress, destAddress, 100_000_000, helloWorldKeys);
+        await sendShell(helloWorldAddress, destAddress, 100_000_000, helloWorldKeys);
 
         console.log('Normal exit');
         process.exit(0);
@@ -71,12 +76,12 @@ const client = new TvmClient({
 
 async function calcHelloWorldAddress(keys) {
     // Get future `helloWorld` contract address from `encode_message` result
-    const { address } = await client.abi.encode_message(buildDeployOptions(keys));
+    const { address } = await client.abi.encode_message(buildDeployOptions(keys, 1_000_000_000));
     console.log(`Future address of helloWorld contract is: ${address}`);
     return address;
 }
 
-function buildDeployOptions(keys) {
+function buildDeployOptions(keys, value) {
     return {
         abi: {
             type: 'Contract',
@@ -84,11 +89,13 @@ function buildDeployOptions(keys) {
         },
         deploy_set: {
             tvc: helloWorld.tvc,
-            initial_data: {},
+            initial_data: {
+                _pubkey: `0x${keys.public}`
+            },
         },
         call_set: {
             function_name: 'constructor',
-            input: {},
+            input: { value },
         },
         signer: {
             type: 'Keys',
@@ -98,8 +105,8 @@ function buildDeployOptions(keys) {
 }
 
 // Request funds from Wallet contract
-async function getTokensFromWallet(dest, value) {
-    console.log(`Transferring ${value} tokens from wallet to ${dest}`);
+async function getTokensFromWallet(dest, shells) {
+    console.log(`Transferring ${shells} tokens from wallet to ${dest}`);
 
     const params = {
         send_events: false,
@@ -110,8 +117,13 @@ async function getTokensFromWallet(dest, value) {
                 function_name: 'sendTransaction',
                 input: {
                     dest,
-                    value,
+                    value: 1000000000,
                     bounce: false,
+                    cc: {
+                        "2": shells
+                    },
+                    flags: 0,
+                    payload: ""
                 },
             },
             signer: {
@@ -120,7 +132,12 @@ async function getTokensFromWallet(dest, value) {
             },
         },
     };
-    await client.processing.process_message(params);
+    const { message } = await client.abi.encode_message(params.message_encode_params);
+    await client.processing.send_message({
+        message,
+        abi: abiContract(WALLET_ABI),
+        send_events: false
+    });
     console.log('Success. Tokens were transferred\n');
 }
 
@@ -128,7 +145,7 @@ async function deploy(keys) {
     console.log('Deploying helloWorld contract');
     await client.processing.process_message({
         send_events: false,
-        message_encode_params: buildDeployOptions(keys),
+        message_encode_params: buildDeployOptions(keys, 1_000_000_000),
     });
     console.log('Success. Contract was deployed\n');
 }
@@ -150,29 +167,12 @@ async function runOnChain(address, methodName) {
             signer: signerNone(),
         },
     };
-    console.log(`Calling ${methodName} function`);
+    console.log(`Calling \`${methodName}\` function`);
     const response = await client.processing.process_message(params);
     const { id, lt } = response.transaction;
     console.log('Success. TransactionId is: %s\n', id);
     return lt;
 }
-
-async function waitForAccountUpdate(address, transLt) {
-    console.log('Waiting for account update');
-    const startTime = Date.now();
-    const account = await client.net.wait_for_collection({
-        collection: 'accounts',
-        filter: {
-            id: { eq: address },
-            last_trans_lt: { gt: transLt },
-        },
-        result: 'boc',
-    });
-    const duration = Math.floor((Date.now() - startTime) / 1000);
-    console.log(`Success. Account was updated, it took ${duration} sec.\n`);
-    return account;
-}
-
 
 async function getAccount(address) {
     // `boc` or bag of cells - native blockchain data layout. Account's boc contains full account state (code and data) that
@@ -194,18 +194,19 @@ async function getAccount(address) {
     const info = result.data.blockchain.account.info;
     return info;
 }
+
 async function runGetMethod(methodName, address, accountState) {
-    // Execute the get method `getTimestamp` on the latest account's state
+    // Execute the get method `timestamp` on the latest account's state
     // This can be managed in 3 steps:
     // 1. Download the latest Account State (BOC) 
     // 2. Encode message
     // 3. Execute the message locally on the downloaded state
 
-    // Encode the message with `getTimestamp` call
+    // Encode the message with `timestamp` call
     const { message } = await client.abi.encode_message({
         // Define contract ABI in the Application
         // See more info about ABI type here:
-        // https://github.com/tonlabs/ever-sdk/blob/master/docs/reference/types-and-methods/mod_abi.md#abi
+        // https://github.com/tvmlabs/tvm-sdk/blob/main/docs/reference/types-and-methods/mod_abi.md#abi
         abi: {
             type: 'Contract',
             value: helloWorld.abi,
@@ -217,11 +218,10 @@ async function runGetMethod(methodName, address, accountState) {
         },
         signer: { type: 'None' },
     });
-
-    // Execute `getTimestamp` get method  (execute the message locally on TVM)
+    // Execute `timestamp` get method  (execute the message locally on TVM)
     // See more info about run_tvm method here:
-    // https://github.com/tonlabs/ever-sdk/blob/master/docs/reference/types-and-methods/mod_tvm.md#run_tvm
-    console.log('Run `getTimestamp` get method');
+    // https://github.com/tvmlabs/tvm-sdk/blob/main/docs/reference/types-and-methods/mod_tvm.md#run_tvm
+    console.log('Run `timestamp` get method');
     const response = await client.tvm.run_tvm({
         message,
         account: accountState,
@@ -233,42 +233,28 @@ async function runGetMethod(methodName, address, accountState) {
     return response.decoded.output;
 }
 
-
-async function runGetMethodAfterLt(methodName, address, transLt) {
-    // Wait for the account state to be more or equal the spesified logical time
-    const accountState = await waitForAccountUpdate(address, transLt).then(({ result }) => result.boc);
-    const result = await runGetMethod(methodName, address, accountState);
-    return result;
-}
-
-async function sendValue(address, dest, amount, keys) {
-    // Encode the message with `sendValue` function call
-    const sendValueParams = {
+async function sendShell(address, dest, value, keys) {
+    // Encode the message with `sendShell` function call
+    const sendShellParams = {
         send_events: false,
         message_encode_params: {
             address,
-            // Define contract ABI in the Application
-            // See more info about ABI type here:
-            // https://github.com/tonlabs/ever-sdk/blob/master/docs/reference/types-and-methods/mod_abi.md#abi
             abi: {
                 type: 'Contract',
                 value: helloWorld.abi,
             },
             call_set: {
-                function_name: 'sendValue',
+                function_name: 'sendShell',
                 input: {
                     dest,
-                    amount,
-                    bounce: false,
+                    value,
                 },
             },
             signer: signerKeys(keys),
         },
     };
-    console.log(`Sending ${amount} tokens to ${dest}`);
-    // Call `sendValue` function
-    const response = await client.processing.process_message(sendValueParams);
-    console.log('Success. Target account will receive: %d tokens\n', response.fees.total_output);
+    console.log(`Sending ${value} tokens to ${dest}`);
+    const response = await client.processing.process_message(sendShellParams);
     return response.transaction.lt;
 }
 
