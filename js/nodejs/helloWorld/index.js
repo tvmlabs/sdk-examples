@@ -108,6 +108,8 @@ function buildDeployOptions(keys, value) {
 async function getTokensFromWallet(dest, shells) {
     console.log(`Transferring ${shells} nanoSHELL tokens from Multisig wallet to ${dest}`);
 
+    // For more information about the parameters for sending an internal message to the `address`, read here:
+    // https://github.com/gosh-sh/TVM-Solidity-Compiler/blob/master/API.md#addresstransfer
     const params = {
         send_events: false,
         message_encode_params: {
