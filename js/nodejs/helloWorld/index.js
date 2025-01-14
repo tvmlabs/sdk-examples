@@ -29,7 +29,7 @@ const client = new TvmClient({
         // Calculate future helloWorld address.
         const helloWorldAddress = await calcHelloWorldAddress(helloWorldKeys);
 
-        // Send some tokens to `helloWorldAddress` before deploy
+        // Send some nanoSHELL tokens to `helloWorldAddress` before deploy
         await getTokensFromWallet(helloWorldAddress, 2_000_000_000);
 
         // Deploy helloWorld
@@ -37,7 +37,7 @@ const client = new TvmClient({
 
         // Get account info and print balance of the helloWorld contract
         let accountState = await getAccount(helloWorldAddress);
-        console.log("helloWorld balance is", accountState.balance);
+        console.log("helloWorld balance is", accountState.balance, "nanoVMSHELL");
 
         // Run account's get method `timestamp`
         let helloWorldTimestamp = await runGetMethod('timestamp', helloWorldAddress, accountState.boc);
@@ -57,7 +57,7 @@ const client = new TvmClient({
         helloWorldTimestamp = await runGetMethod('timestamp', helloWorldAddress, accountState.boc);
         console.log("Updated `timestamp` value is", helloWorldTimestamp)
 
-        // Send some tokens from helloWorld to a random account
+        // Send some nanoSHELL tokens from helloWorld to a random account
         // Remember the logical time of the generated transaction
         const destAddress = await genRandomAddress();
         await sendShell(helloWorldAddress, destAddress, 100_000_000, helloWorldKeys);
@@ -104,9 +104,9 @@ function buildDeployOptions(keys, value) {
     };
 }
 
-// Request funds from Wallet contract
+// Request funds from Multisig Wallet contract.
 async function getTokensFromWallet(dest, shells) {
-    console.log(`Transferring ${shells} tokens from wallet to ${dest}`);
+    console.log(`Transferring ${shells} nanoSHELL tokens from Multisig wallet to ${dest}`);
 
     const params = {
         send_events: false,
@@ -117,6 +117,8 @@ async function getTokensFromWallet(dest, shells) {
                 function_name: 'sendTransaction',
                 input: {
                     dest,
+                    // Specify the amount in nanoVMSHELL that will be deducted from the Multisig balance
+                    // and used to cover the transaction fees.
                     value: 1000000000,
                     bounce: false,
                     cc: {
@@ -253,7 +255,7 @@ async function sendShell(address, dest, value, keys) {
             signer: signerKeys(keys),
         },
     };
-    console.log(`Sending ${value} tokens to ${dest}`);
+    console.log(`Sending ${value} nanoSHELL tokens to ${dest}`);
     const response = await client.processing.process_message(sendShellParams);
     return response.transaction.lt;
 }
