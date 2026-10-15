@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 //
 // Transfers NACKL from a multisig wallet (a single-custodian
-// UpdateCustodianMultisigWallet_v2, e.g. one deployed by deploy-multisig.js
+// ExchangeMultisigWallet, e.g. one deployed by deploy-multisig.js
 // or deploy-multisig.sh) to the given address, with tvm-sdk-js.
 
 "use strict";
@@ -137,25 +137,28 @@ async function main() {
         c.fetchAccount(client, address).catch((err) => c.die(`failed to get the ${what} state: ${err.message}`));
 
     // The wallet must be deployed, run the expected contract, and have our key
-    // as its only custodian (otherwise sendTransaction is rejected).
-    const walletId = wallet.split("::")[1];
+    // as its only custodian (otherwise submitTransaction is rejected).
+    const [walletDapp, walletId] = wallet.split("::");
     const from = await fetchAccount(wallet, "wallet");
     if (from.type !== "Active") c.die(`wallet ${wallet} is not deployed (state: ${from.type})`);
     if (from.codeHash !== c.MSIG_CODE_HASH) c.die(`${wallet} is not a ${c.MSIG} (code hash ${from.codeHash})`);
 
-    let custodians;
-    try {
-        const { message } = await client.abi.encode_message({
-            abi,
-            address: `0:${walletId}`,
-            call_set: { function_name: "getCustodians", input: {} },
-            signer: { type: "None" },
-        });
-        const { decoded } = await client.tvm.run_tvm({ message, account: from.boc, abi });
-        custodians = decoded.output.custodians;
-    } catch (err) {
-        c.die(`failed to get the wallet custodians: ${err.message}`);
-    }
+    // Runs a getter of the wallet locally on the given account state.
+    const runGetter = async (functionName, boc) => {
+        try {
+            const { message } = await client.abi.encode_message({
+                abi,
+                address: `0:${walletId}`,
+                call_set: { function_name: functionName, input: {} },
+                signer: { type: "None" },
+            });
+            return (await client.tvm.run_tvm({ message, account: boc, abi })).decoded.output;
+        } catch (err) {
+            c.die(`failed to run ${functionName} of the wallet: ${err.message}`);
+        }
+    };
+
+    const { custodians } = await runGetter("getCustodians", from.boc);
     if (custodians.length !== 1) {
         c.die("the wallet has several custodians: this script supports single-custodian wallets only");
     }
@@ -213,28 +216,60 @@ Amount:  ${c.fmtNano(amount)} NACKL
         }
     }
 
-    c.info("Sending the transfer");
+    // The wallet executes a transfer only with the nonce that follows the last
+    // used one, so it is read from the current state, after the confirmation.
+    const lastNonce = async () => BigInt((await runGetter("getNonce", (await fetchAccount(wallet, "wallet")).boc)).nonce);
+    const nonce = (await lastNonce()) + 1n;
+
+    c.info(`Sending the transfer, nonce ${nonce}`);
     // The transfer must run exactly once: a new message is sent only after the
-    // previous one has expired without a transaction.
+    // previous one has expired without a transaction, and every message carries
+    // the same nonce, which the wallet accepts only once.
     const tx = await c.sendReliably(client, {
         abi,
         accountId: walletId,
-        dappId: wallet.split("::")[0],
+        dappId: walletDapp,
+        // 127: the nonce is not the next one. Either it is already used (the
+        // message is refused before it is accepted) or it skips ahead (the
+        // transaction is aborted). The nonce only grows, so the call can never
+        // succeed; the wallet's current nonce tells which case it is. The state
+        // read right after the refusal can lag behind the one the node checked,
+        // so a nonce below ours is read again for a while.
+        exitCodeErrors: {
+            127: async () => {
+                let last;
+                for (let i = 0; i < 5; i++) {
+                    if (i > 0) await c.sleep(2000);
+                    last = (await lastNonce().catch(() => undefined)) ?? last;
+                    if (last >= nonce) break;
+                }
+                let reason;
+                if (last === undefined) {
+                    reason = `the wallet refused nonce ${nonce} as not the next one and its last nonce could not be read`;
+                } else if (last >= nonce) {
+                    reason = `nonce ${nonce} is already used by another transfer from this wallet (its last nonce is ${last})`;
+                } else {
+                    reason = `nonce ${nonce} is not the next one (the wallet's last nonce is ${last})`;
+                }
+                return `${reason}. No NACKL was sent: check the wallet and run the script again`;
+            },
+        },
         encode: (expire) =>
             client.abi.encode_message({
                 abi,
                 address: `0:${walletId}`,
                 call_set: {
-                    function_name: "sendTransaction",
+                    function_name: "submitTransaction",
                     header: { expire },
                     input: {
                         dest: `0:${destAcc}`,
                         value: 0,
                         cc: { [c.ECC_NACKL]: amount.toString() },
                         bounce,
-                        flags: 1,
+                        flag: 1,
                         payload: "",
                         dapp_id: `0x${destDapp}`,
+                        nonce: nonce.toString(),
                     },
                 },
                 signer: { type: "Keys", keys },

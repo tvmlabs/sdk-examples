@@ -69,10 +69,34 @@ one.
 
 ## Usage
 
+By default, the scripts run on Acki Nacki Mainnet. 
+To use Shellnet, specify the network with the `-u` option.
+
+**Mainnet**
+
+Run the scripts without specifying a network:
+
 ```sh
-node deploy-multisig.js -u shellnet.ackinacki.org            # wallet in ./msig-wallet
+# Deploy a multisig wallet (files saved to ./msig-wallet)
+node deploy-multisig.js
+
+# Send 1.5 NACKL to the specified address
+node send-nackl.js <DAPP_ID::ACCOUNT_ID> 1.5
+```
+
+**Shellnet (Test Network)**
+
+Use `-u shellnet.ackinacki.org` to run the scripts on Shellnet:
+
+```sh
+# Deploy a multisig wallet (files saved to ./msig-wallet)
+node deploy-multisig.js -u shellnet.ackinacki.org
+
+# Send 1.5 NACKL to the specified address
 node send-nackl.js -u shellnet.ackinacki.org <DAPP_ID::ACCOUNT_ID> 1.5
 ```
+
+Replace <DAPP_ID::ACCOUNT_ID> with the recipient's address.
 
 Run either script with `--help` for all options.
 
@@ -95,6 +119,22 @@ the transfer like this:
    transaction one last time. If it is still missing, the message can no longer
    be executed, so encode a new one and go back to step 2 (three messages at
    most).
+
+The wallet contract, `ExchangeMultisigWallet`, adds its own protection for
+transfers: `submitTransaction` takes a nonce and executes only with the one that
+follows `getNonce()`. `send-nackl.js` reads the nonce once and puts the same
+value into every message of a transfer, so at most one of them can execute.
+
+Two refusals settle a message at once, without waiting for it to expire:
+
+- Exit code 52, replay protection: the message is not newer than one the
+  wallet has already accepted, so it can never be executed. A new message is
+  sent right away.
+- Exit code 127 from `submitTransaction`: the nonce is not the next one, and it
+  never will be. `send-nackl.js` stops and reads the wallet's nonce to tell
+  whether another transfer has already used it or the nonce skips ahead. The
+  nonce read right after the refusal can lag behind, so a value below ours is
+  read again for up to 10 seconds.
 
 The thread comes from the node's reply, or from the block of the account's
 latest transaction when the reply has none. If the outcome cannot be established

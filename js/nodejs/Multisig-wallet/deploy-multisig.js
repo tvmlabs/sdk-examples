@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 //
 // Deploys a single-custodian Acki Nacki multisig wallet
-// (UpdateCustodianMultisigWallet_v2) with tvm-sdk-js.
+// (ExchangeMultisigWallet) with tvm-sdk-js.
 //
 // Flow: download the contract if needed -> generate keys and compute the
 // address -> ask the user to top the address up and wait for confirmation ->
@@ -97,14 +97,14 @@ async function main() {
     // generating new ones, otherwise the phrase would no longer match the wallet.
     if (!c.nonEmpty(keysFile) && fs.existsSync(seedFile)) {
         c.info(`No keys found, deriving them from the seed phrase in ${seedFile}`);
-        let keys;
+        let derived;
         try {
-            keys = await c.deriveKeys(client, fs.readFileSync(seedFile, "utf8").trim());
+            derived = await c.deriveKeys(client, fs.readFileSync(seedFile, "utf8").trim());
         } catch {
             // The SDK error is not printed: it may quote the phrase.
             c.die(`failed to derive keys from the seed phrase in ${seedFile}: the phrase is empty or corrupted`);
         }
-        c.writeFileAtomic(keysFile, c.keysJson(keys));
+        c.writeFileAtomic(keysFile, c.keysJson(derived));
     }
 
     let keys;

@@ -8,10 +8,12 @@ const os = require("os");
 const path = require("path");
 const readline = require("readline");
 
-const MSIG = "UpdateCustodianMultisigWallet_v2";
+const MSIG = "ExchangeMultisigWallet";
+// The contract comes from a branch, which can move: the code hash pins the
+// exact build, and a downloaded TVC with a different code is rejected.
 const MSIG_URL =
-    "https://raw.githubusercontent.com/ackinacki/ackinacki/df524923ef1d2892bf93d239914e94276826d196/contracts/0.81.0_compiled/updatecustodianmultisigwallet_v2";
-const MSIG_CODE_HASH = "cfcaac10d43c8dc062298cb48df097be67cddec52b9cfd558309a7549f01c1f1";
+    "https://raw.githubusercontent.com/ackinacki/ackinacki/refs/heads/main/contracts/exchangemultisigwallet";
+const MSIG_CODE_HASH = "82fa2f6fed8edf8b247c2a529090d30f60be06da7f4c818de528da07305e79b7";
 const CACHE_DIR =
     process.env.ACKI_CACHE_DIR ||
     path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache"), "acki-nacki-scripts");
@@ -28,8 +30,6 @@ const SDK_MIN = "3.0.0";
 const ECC_NACKL = 1;
 const ECC_SHELL = 2;
 const NANO = 1_000_000_000n;
-// tvm_client net error code for a missing account.
-const ERR_NOT_FOUND = 622;
 
 class UserError extends Error {}
 
@@ -164,11 +164,6 @@ function keysJson(keys) {
 // A Node.js addon shipped next to the scripts for the current platform.
 const BUNDLED_ADDON = path.join(__dirname, "addon", `${process.platform}-${process.arch}`, "tvmsdk.node");
 
-// tvm-sdk ClientErrorCode.HttpClientCreateError. tvm-sdk 3.0.6 checks TLS
-// certificates against the system store, and on Linux it cannot create its
-// HTTP client at all when the system has no CA certificates.
-const HTTP_CLIENT_CREATE_ERROR = 9;
-
 // Picks the Node.js addon: TVMSDK_ADDON, then the bundled one, then the one
 // inside @tvmsdk/lib-node. A file that is found but fails to load is an error,
 // not a reason to try the next one.
@@ -191,9 +186,9 @@ function addonPath() {
 // built from tvm-sdk 3.0 or newer: older ones speak the pre-dapp_id protocol
 // that current nodes reject.
 async function createClient(endpoint) {
-    let TvmClient;
+    let TvmClient, ClientErrorCode;
     try {
-        ({ TvmClient } = require("@tvmsdk/core"));
+        ({ TvmClient, ClientErrorCode } = require("@tvmsdk/core"));
     } catch {
         die(`@tvmsdk/core is not installed: run npm install in ${__dirname}`);
     }
@@ -210,7 +205,9 @@ async function createClient(endpoint) {
     try {
         ({ version } = await client.client.version());
     } catch (err) {
-        if (err.code === HTTP_CLIENT_CREATE_ERROR) {
+        // tvm-sdk 3.0.6 checks TLS certificates against the system store, and on
+        // Linux it cannot create its HTTP client at all without CA certificates.
+        if (err.code === ClientErrorCode.HttpClientCreateError) {
             die(`${err.message}. tvm-sdk needs the system CA certificates: install the ca-certificates package or set SSL_CERT_FILE to a CA bundle`);
         }
         throw err;
@@ -260,7 +257,7 @@ async function fetchAccount(client, address) {
     try {
         ({ boc } = await client.account.get_account({ account_id, dapp_id }));
     } catch (err) {
-        if (err.code === ERR_NOT_FOUND) {
+        if (err.code === require("@tvmsdk/core").NetErrorCode.NotFound) {
             return { type: "NonExist", balance: 0n, nackl: 0n, shell: 0n, codeHash: undefined, boc: undefined };
         }
         throw err;
@@ -291,8 +288,17 @@ const POLL_INTERVAL_MS = 2000;
 // Seconds to keep waiting after the expiration time for the thread to produce
 // a newer block, before reporting that the outcome is unknown.
 const EXPIRY_GRACE = 120;
+// Seconds the local clock may lag behind the chain. No block can be newer than
+// the expiration time before that time comes, so the thread is not asked for
+// one earlier than this margin.
+const CLOCK_DRIFT = 10;
 
 const TX_FIELDS = "id status_name aborted compute { exit_code }";
+
+// TVM Solidity replay protection refuses, before accepting it, a message whose
+// time header is not newer than that of the last accepted one. That time only
+// grows, so a refused message can never be executed.
+const ERR_REPLAY_PROTECTION = 52;
 
 async function blockchainQuery(client, query, variables) {
     const { result } = await client.net.query({ query, variables });
@@ -300,25 +306,19 @@ async function blockchainQuery(client, query, variables) {
 }
 
 // The transaction that consumed the message, if the database has it. It is
-// looked up by the hash the node reported and also through the message: a node
+// looked up through the message and also by the hash the node reported: a node
 // that failed to answer reports no transaction, and a reported one may belong
 // to a block that was never finalized.
 async function findTransaction(client, sent) {
-    let reported;
-    if (sent.txHash) {
-        ({ transaction: reported } = await blockchainQuery(
-            client,
-            `query($h: String!) { blockchain { transaction(hash: $h) { ${TX_FIELDS} } } }`,
-            { h: sent.txHash },
-        ));
-        if (reported?.status_name === "Finalized") return reported;
-    }
-    const { message } = await blockchainQuery(
-        client,
-        `query($h: String!) { blockchain { message(hash: $h) { dst_transaction { ${TX_FIELDS} } } } }`,
-        { h: sent.messageId },
-    );
-    return message?.dst_transaction ?? reported ?? undefined;
+    const byMessage = `message(hash: $m) { dst_transaction { ${TX_FIELDS} } }`;
+    const { message, transaction } = sent.txHash
+        ? await blockchainQuery(
+              client,
+              `query($m: String!, $t: String!) { blockchain { ${byMessage} transaction(hash: $t) { ${TX_FIELDS} } } }`,
+              { m: sent.messageId, t: sent.txHash },
+          )
+        : await blockchainQuery(client, `query($m: String!) { blockchain { ${byMessage} } }`, { m: sent.messageId });
+    return transaction?.status_name === "Finalized" ? transaction : (message?.dst_transaction ?? transaction);
 }
 
 // The thread that produced the latest transaction of the account.
@@ -341,26 +341,27 @@ async function accountThread(client, accountId, dappId) {
         "query($h: String!) { blockchain { block(hash: $h) { thread_id } } }",
         { h: transaction.block_id },
     );
-    return block?.thread_id ?? undefined;
+    return block?.thread_id;
 }
 
 // The generation time of the newest finalized block of the thread. The block
-// list holds only hashes, so each block is fetched separately.
+// list holds only hashes; the blocks themselves are fetched in one request.
 async function threadTime(client, threadId) {
     const { blocks } = await blockchainQuery(
         client,
         "query($t: String!) { blockchain { blocks(thread_id: $t, last: 3) { nodes { hash } } } }",
         { t: threadId },
     );
-    for (const { hash } of blocks.nodes.reverse()) {
-        const { block } = await blockchainQuery(
-            client,
-            "query($h: String!) { blockchain { block(hash: $h) { gen_utime status_name } } }",
-            { h: hash },
-        );
-        if (block?.status_name === "FINALIZED") return block.gen_utime;
-    }
-    return undefined;
+    const hashes = blocks.nodes.map((node) => node.hash).reverse();
+    if (hashes.length === 0) return undefined;
+    const params = hashes.map((_, i) => `$h${i}: String!`).join(", ");
+    const fields = hashes.map((_, i) => `b${i}: block(hash: $h${i}) { gen_utime status_name }`).join(" ");
+    const found = await blockchainQuery(
+        client,
+        `query(${params}) { blockchain { ${fields} } }`,
+        Object.fromEntries(hashes.map((hash, i) => [`h${i}`, hash])),
+    );
+    return hashes.map((_, i) => found[`b${i}`]).find((block) => block?.status_name === "FINALIZED")?.gen_utime;
 }
 
 const utcTime = (seconds) => `${new Date(seconds * 1000).toISOString().slice(11, 19)} UTC`;
@@ -382,11 +383,12 @@ async function awaitOutcome(client, sent, { pollMs, grace }) {
             // only the absence of any transaction proves the message dead.
             const pending = tx && tx.status_name !== "Refused";
             if (expired && !pending) return undefined;
-            threadId ??= await accountThread(client, sent.accountId, sent.dappId);
-            const time = threadId ? await threadTime(client, threadId) : undefined;
-            // The transaction is looked up once more after this block: it may
-            // have been stored just before the block was.
-            if (time > sent.expireAt) expired = true;
+            if (!expired && Date.now() / 1000 >= sent.expireAt - CLOCK_DRIFT) {
+                threadId ??= await accountThread(client, sent.accountId, sent.dappId);
+                // The transaction is looked up once more after this block: it
+                // may have been stored just before the block was.
+                expired = threadId != null && (await threadTime(client, threadId)) > sent.expireAt;
+            }
             lastError = undefined;
         } catch (err) {
             lastError = err;
@@ -406,40 +408,72 @@ async function awaitOutcome(client, sent, { pollMs, grace }) {
 // Sends an external message to ACCOUNT_ID of DAPP_ID and returns its finalized
 // transaction, sending a new message if one expires without being executed.
 // `encode(expireAt)` builds the message for the given expiration time (the
-// `expire` ABI header) with abi.encode_message.
+// `expire` ABI header) with abi.encode_message. `exitCodeErrors` maps contract
+// exit codes after which the call can never succeed to functions returning the
+// error to stop with: such a refusal is not waited out until the message
+// expires.
 async function sendReliably(
     client,
-    { abi, accountId, dappId, encode, lifetime = MESSAGE_LIFETIME, attempts = SEND_ATTEMPTS, pollMs = POLL_INTERVAL_MS, grace = EXPIRY_GRACE },
+    {
+        abi,
+        accountId,
+        dappId,
+        encode,
+        exitCodeErrors = {},
+        lifetime = MESSAGE_LIFETIME,
+        attempts = SEND_ATTEMPTS,
+        pollMs = POLL_INTERVAL_MS,
+        grace = EXPIRY_GRACE,
+    },
 ) {
+    const stopOn = async (exitCode) => {
+        if (Object.hasOwn(exitCodeErrors, exitCode)) die(await exitCodeErrors[exitCode]());
+    };
     for (let attempt = 1; ; attempt++) {
         const expireAt = Math.floor(Date.now() / 1000) + lifetime;
         const { message, message_id: messageId } = await encode(expireAt);
         const sent = { messageId, expireAt, accountId, dappId };
+        let failure;
         try {
             const result = await client.processing.send_message({ message, abi, dapp_id: dappId, send_events: false });
+            sent.txHash = result.tx_hash;
+            sent.threadId = result.thread_id;
             if ((result.aborted || result.exit_code) && !result.tx_hash) {
-                die(`the contract rejected the message: exit code ${result.exit_code}`);
+                failure = { text: "the contract refused it", exitCode: result.exit_code };
             }
-            sent.txHash = result.tx_hash ?? undefined;
-            sent.threadId = result.thread_id ?? undefined;
-            info(`Message ${messageId} sent, waiting for its transaction to be finalized`);
         } catch (err) {
-            if (err instanceof UserError) throw err;
+            const details = err.data?.node_error?.extensions?.details;
+            sent.threadId = details?.thread_id;
+            failure = { text: err.message.split("\n")[0], exitCode: details?.exit_code };
+        }
+        let refused = false;
+        if (failure) {
+            const code = failure.exitCode === undefined ? "" : ` (exit code ${failure.exitCode})`;
+            info(`Sending message ${messageId} failed: ${failure.text}${code}`);
+            await stopOn(failure.exitCode);
+            // A message refused by replay protection is dead, so a new one can
+            // go at once, unless the database has a transaction for it or
+            // cannot be asked: then it is waited out like any other failure.
+            refused = failure.exitCode === ERR_REPLAY_PROTECTION && !(await findTransaction(client, sent).catch(() => true));
             // The node may have accepted the message even though sending
             // failed, so the outcome is checked the same way.
-            sent.threadId = err.data?.node_error?.extensions?.details?.thread_id;
-            info(`Sending message ${messageId} failed: ${err.message.split("\n")[0]}`);
-            info(`Checking whether it was executed anyway; it expires at ${utcTime(expireAt)}`);
+            if (!refused) info(`Checking whether it was executed anyway; it expires at ${utcTime(expireAt)}`);
+        } else {
+            info(`Message ${messageId} sent, waiting for its transaction to be finalized`);
         }
-        const tx = await awaitOutcome(client, sent, { pollMs, grace });
-        if (tx) {
-            if (tx.aborted) die(`transaction ${tx.id} was aborted, exit code ${tx.compute?.exit_code}`);
-            return tx;
+        if (!refused) {
+            const tx = await awaitOutcome(client, sent, { pollMs, grace });
+            if (tx?.aborted) {
+                await stopOn(tx.compute?.exit_code);
+                die(`transaction ${tx.id} was aborted, exit code ${tx.compute?.exit_code}`);
+            }
+            if (tx) return tx;
         }
         if (attempt >= attempts) {
-            die(`${attempts} messages expired without a transaction. Nothing was executed, it is safe to run the script again`);
+            die(`none of ${attempts} messages was executed: each expired or was refused. It is safe to run the script again`);
         }
-        info(`The message expired without a transaction, sending a new one (attempt ${attempt + 1} of ${attempts})`);
+        const why = refused ? "was refused by replay protection" : "expired without a transaction";
+        info(`The message ${why}, sending a new one (attempt ${attempt + 1} of ${attempts})`);
     }
 }
 
@@ -451,7 +485,6 @@ module.exports = {
     DEFAULT_ENDPOINT,
     WORD_COUNT,
     DICTIONARY_ENGLISH,
-    UserError,
     die,
     info,
     run,
@@ -459,7 +492,6 @@ module.exports = {
     ask,
     toNano,
     fmtNano,
-    versionGe,
     nonEmpty,
     writeFileAtomic,
     ensureContract,
