@@ -1,0 +1,14 @@
+{
+	"name": "acki-nacki-msig-scripts",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Deploy a single-custodian Acki Nacki multisig wallet and transfer NACKL with tvm-sdk-js",
+	"license": "Apache-2.0",
+	"engines": {
+		"node": ">=18"
+	},
+	"dependencies": {
+		"@tvmsdk/core": "2.2.0",
+		"@tvmsdk/lib-node": "2.0.2"
+	}
+}
