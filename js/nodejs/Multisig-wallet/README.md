@@ -1,15 +1,17 @@
 # Multisig deploy and NACKL transfer (tvm-sdk-js)
 
-JavaScript versions of `deploy-multisig.sh` and `send-nackl.sh`, built on
-[tvm-sdk-js](https://github.com/tvmlabs/tvm-sdk-js). They behave like the bash
-scripts and use the same wallet directory layout, so either version can
-continue the other's work. Unlike the bash scripts, they make sure a message is
-executed exactly once (see [How messages are sent](#how-messages-are-sent)).
+`deploy-multisig.js` and `send-nackl.js` use
+[tvm-sdk-js](https://github.com/tvmlabs/tvm-sdk-js) to deploy a single-custodian
+`ExchangeMultisigWallet` and transfer NACKL. They share the wallet directory
+layout with the [shell scripts](../../../shell/Multisig-wallet/README.md). Use
+`-d DIR` with both implementations to point them at the same wallet. The Node.js
+scripts check transaction finality before retrying a message (see
+[How messages are sent](#how-messages-are-sent)).
 
 ## Requirements
 
 - Node.js 18 or newer.
-- `npm install` in this directory (`@tvmsdk/core`, `@tvmsdk/lib-node`).
+- `npm ci` in this directory (`@tvmsdk/core`, `@tvmsdk/lib-node`).
 - A `tvmsdk.node` addon built from **tvm-sdk 3.0 or newer**.
 - System CA certificates: tvm-sdk checks TLS certificates against the system
   store and cannot connect without it. On Linux, install the `ca-certificates`
@@ -33,8 +35,8 @@ Docker container, so it runs on any Linux with glibc 2.31 or newer, and writes
 it to `addon/linux-<arch>/tvmsdk.node`:
 
 ```sh
-./build-addon.sh ../tvm-sdk-js                # branch feature/update-to-tvm-sdk-3.0.6
-./build-addon.sh ../tvm-sdk-js <REF>          # any other git ref
+bash build-addon.sh /path/to/tvm-sdk-js        # branch feature/update-to-tvm-sdk-3.0.6
+bash build-addon.sh /path/to/tvm-sdk-js REF    # another git ref
 ```
 
 It needs Docker and builds for the architecture Docker runs on. The first
@@ -69,8 +71,11 @@ one.
 
 ## Usage
 
-By default, the scripts run on Acki Nacki Mainnet. 
-To use Shellnet, specify the network with the `-u` option.
+From the repository root, enter `js/nodejs/Multisig-wallet` and run `npm ci`.
+The included `addon/linux-x64/tvmsdk.node` is used automatically on Linux
+x64; other platforms need a compatible addon from the build instructions above.
+By default, the scripts use Acki Nacki Mainnet (`mainnet.ackinacki.org`).
+Set `ACKI_ENDPOINT` or pass `-u`/`--url` to select another endpoint.
 
 **Mainnet**
 
@@ -81,7 +86,7 @@ Run the scripts without specifying a network:
 node deploy-multisig.js
 
 # Send 1.5 NACKL to the specified address
-node send-nackl.js <DAPP_ID::ACCOUNT_ID> 1.5
+node send-nackl.js '<DAPP_ID::ACCOUNT_ID>' 1.5
 ```
 
 **Shellnet (Test Network)**
@@ -93,12 +98,26 @@ Use `-u shellnet.ackinacki.org` to run the scripts on Shellnet:
 node deploy-multisig.js -u shellnet.ackinacki.org
 
 # Send 1.5 NACKL to the specified address
-node send-nackl.js -u shellnet.ackinacki.org <DAPP_ID::ACCOUNT_ID> 1.5
+node send-nackl.js -u shellnet.ackinacki.org '<DAPP_ID::ACCOUNT_ID>' 1.5
 ```
 
-Replace <DAPP_ID::ACCOUNT_ID> with the recipient's address.
+The deployment script creates keys, a seed phrase, an address, an ABI, and a TVC
+in `./msig-wallet`. It shows the address to fund; send at least 0.5 SHELL
+converted to VMSHELL (flag 16), then confirm the funding prompt. VMSHELL pays
+deployment and transfer fees. Back up the seed phrase offline and keep the
+wallet directory private. A later run with the same directory resumes the
+deployment.
 
-Run either script with `--help` for all options.
+Replace the quoted `<DAPP_ID::ACCOUNT_ID>` placeholder with the recipient's
+address (two 64-character hexadecimal IDs). The amount is in NACKL and supports
+up to nine decimal places. `send-nackl.js` checks the wallet, its custodian key,
+and balances, then asks for confirmation. A nonexistent recipient is accepted
+only if its two address IDs are equal.
+
+Both scripts support `-d DIR` for another wallet directory. Deployment supports
+`-m N` for a different minimum VMSHELL balance. Sending supports `-w ADDRESS`,
+`-k FILE`, and `-y` to choose a wallet, key file, or skip confirmation. Run
+either script with `--help` for all options.
 
 ## How messages are sent
 
@@ -111,9 +130,9 @@ the transfer like this:
 1. Encode the message with an explicit expiration time (the `expire` ABI
    header), 60 seconds ahead. The contract rejects the message after that time.
 2. Send it with `processing.send_message`.
-3. Look for the message's transaction in the database, by the transaction hash
-   the node returned and by the message hash (the only way after a failed
-   send). A transaction with the `Finalized` status is the result.
+3. Look for the message's transaction in the database by message hash and,
+   when provided, by the transaction hash returned by the node. A transaction
+   with the `Finalized` status is the result.
 4. While there is none, poll the newest finalized block of the account's
    thread. Once its `gen_utime` is past the expiration time, look for the
    transaction one last time. If it is still missing, the message can no longer
@@ -150,7 +169,8 @@ The GraphQL queries involved (`blockchain { ... }`), sent with `net.query`:
 | Transaction by hash | `transaction(hash) { id status_name aborted compute { exit_code } }` |
 | Transaction by message | `message(hash) { dst_transaction { ... } }` |
 | Newest blocks of a thread | `blocks(thread_id, last: 3) { nodes { hash } }` |
-| Block time and status | `block(hash) { gen_utime status_name thread_id }` |
+| Block time and status | `block(hash) { gen_utime status_name }` |
+| Thread of the account's latest transaction | `block(hash) { thread_id }` |
 | Account's latest transaction | `account(account_id, dapp_id) { transactions(last: 1) { nodes { id } } }` |
 
 Lists return only hashes; `block(hash)` and `transaction(hash)` return the
